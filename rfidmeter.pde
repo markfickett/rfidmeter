@@ -10,11 +10,6 @@
  *
  */
 
-#define PIN_SENSOR_PHOTO	A0
-#define PIN_LED_LIGHT		9
-#define PHOTO_SENSOR_MIN	512
-#define PHOTO_SENSOR_MAX	920
-
 #define PIN_BUTTON		6
 
 #define PIN_SPEAKER		8
@@ -23,26 +18,27 @@
 #define PIN_LED_GREEN		10
 #define PIN_LED_RED		11
 
-// RFID pins #defined in ID12.h
-
 #define PIN_STATUS		13
 
 // Pre-include for ID12, since only the main .pde is pre-processed.
 #include <NewSoftSerial.h>
 
+// RFID pins #defined in ID12.h
 #include "ID12.h"
 
-struct MeteredID {
+// LED and ambient light sensor pins #defined in NightLight.h
+#include "NightLight.h"
+
+typedef struct {
 	byte id[ID12_TAG_LENGTH];
 	unsigned long elapsedMillis;	// rollover when millis() wraps
 	unsigned long lastTakenMillis;	// from millis()
-};
+} MeteredID;
 
 byte currentID[ID12_TAG_LENGTH];
 
 void setup()
 {
-	pinMode(PIN_LED_LIGHT, OUTPUT);
 	pinMode(PIN_BUTTON, INPUT);
 
 	digitalWrite(PIN_BUTTON, HIGH);
@@ -75,7 +71,7 @@ void setup()
 
 void loop()
 {
-	updateLight();
+	NightLight::updateLight();
 
 	// NEXT
 	//if the system clock has wrapped:
@@ -161,22 +157,6 @@ void loop()
 			digitalWrite(PIN_LED_RED, HIGH);
 			digitalWrite(PIN_LED_RED, LOW);
 		*/
-	}
-}
-
-/**
- * Make a (bright) LED's brightness inversely proportional to sensed ambient
- * light, with a full-off threshold. (Light-sensing night-light.)
- */
-void updateLight()
-{
-	int v = analogRead(PIN_SENSOR_PHOTO);
-	if (v <= PHOTO_SENSOR_MIN) {
-		digitalWrite(PIN_LED_LIGHT, LOW);
-	} else {
-		v = constrain(v, PHOTO_SENSOR_MIN, PHOTO_SENSOR_MAX);
-		analogWrite(PIN_LED_LIGHT,
-			map(v, PHOTO_SENSOR_MIN, PHOTO_SENSOR_MAX, 0, 1023));
 	}
 }
 
