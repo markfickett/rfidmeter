@@ -23,14 +23,14 @@
 
 #include "WProgram.h"
 
-#define PIN_RFID_DATA		5
-#define PIN_RFID_RESET		4
-#define PIN_RFID_TX_NC		12	// unused
-#define RFID_SERIAL_BAUD	9600
+#define PIN_ID12_DATA		5
+#define PIN_ID12_RESET		4
+#define PIN_ID12_TX_NC		12	// unused
+#define ID12_SERIAL_BAUD	9600
 
-#define RFID_TAG_LENGTH		5	// 5 bytes per ID
-// ASCII input buffer: 10 data + 2 checksum
-#define RFID_TAG_INPUT		12
+#define ID12_TAG_LENGTH		5	// 5 bytes per ID for 10 hex characters
+
+//#define ID12_DEBUG_PRINT
 
 namespace ID12 {
 	/** Initialize the Serial connection to the ID-12. */
@@ -47,11 +47,12 @@ namespace ID12 {
 	 * @return whether retrieval was successful; on failure,
 	 *	the idBuffer may be partially modified
 	 */
-	boolean getID(byte idBuffer[RFID_TAG_LENGTH]);
+	boolean getID(byte idBuffer[ID12_TAG_LENGTH]);
 
-	boolean equal(const byte idBufferA[RFID_TAG_LENGTH],
-		const byte idBufferB[RFID_TAG_LENGTH]);
-	void copy(byte dest[RFID_TAG_LENGTH], const byte src[RFID_TAG_LENGTH]);
-	void clear(byte idBuffer[RFID_TAG_LENGTH]);
+	boolean equal(const byte idBufferA[ID12_TAG_LENGTH],
+		const byte idBufferB[ID12_TAG_LENGTH]);
+	void copy(byte dest[ID12_TAG_LENGTH], const byte src[ID12_TAG_LENGTH]);
+	void clear(byte idBuffer[ID12_TAG_LENGTH]);
+	void print(const byte idBuffer[ID12_TAG_LENGTH]);
 };
 

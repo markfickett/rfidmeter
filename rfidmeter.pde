@@ -33,12 +33,12 @@
 #include "ID12.h"
 
 struct MeteredID {
-	byte id[RFID_TAG_LENGTH];
+	byte id[ID12_TAG_LENGTH];
 	unsigned long elapsedMillis;	// rollover when millis() wraps
 	unsigned long lastTakenMillis;	// from millis()
 };
 
-byte currentID[RFID_TAG_LENGTH];
+byte currentID[ID12_TAG_LENGTH];
 
 void setup()
 {
@@ -51,10 +51,6 @@ void setup()
 
 	pinMode(PIN_LED_GREEN, OUTPUT);
 	pinMode(PIN_LED_RED, OUTPUT);
-
-	pinMode(PIN_RFID_DATA, INPUT);
-	pinMode(PIN_RFID_RESET, OUTPUT);
-	digitalWrite(PIN_RFID_RESET, HIGH);
 
 	pinMode(PIN_STATUS, OUTPUT);
 
@@ -72,6 +68,9 @@ void setup()
 	digitalWrite(PIN_STATUS, HIGH);
 	delay(500);
 	digitalWrite(PIN_STATUS, LOW);
+
+	Serial.begin(28800);
+	Serial.println("Setup complete.");
 }
 
 void loop()
@@ -92,7 +91,8 @@ void loop()
 	// Something was scanned.
 	if (ID12::hasID())
 	{
-		byte newID[RFID_TAG_LENGTH];
+		Serial.println("Retreiving ID...");
+		byte newID[ID12_TAG_LENGTH];
 		boolean gotID;
 
 		// status double-blink: reading
@@ -107,16 +107,34 @@ void loop()
 
 		if (gotID)
 		{
+			Serial.print("New: ");
+			ID12::print(newID);
 			// 500ms blink: green for new, red for same
-			int ledPin = ID12::equal(newID, currentID) ?
-				PIN_LED_RED : PIN_LED_GREEN;
+			int ledPin;
+			if (ID12::equal(newID, currentID))
+			{
+				ledPin = PIN_LED_RED;
+				Serial.print(" (same)");
+			} else {
+				ledPin = PIN_LED_GREEN;
+				Serial.print(" (different)");
+			}
+			Serial.println();
+
 			digitalWrite(ledPin, HIGH);
 			delay(500);
 			digitalWrite(ledPin, LOW);
+
+			Serial.print("\tOld:\t");
+			ID12::print(currentID);
 			ID12::copy(currentID, newID);
+			Serial.print("\n\tSaved:\t");
+			ID12::print(currentID);
+			Serial.println();
 		}
 		else
 		{
+			Serial.println("Error.");
 			// 2s blink red: fail
 			digitalWrite(PIN_LED_RED, HIGH);
 			delay(2000);
