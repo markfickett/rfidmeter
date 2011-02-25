@@ -15,7 +15,7 @@ namespace Meters {
 	 * (This is the avoid-overdose assumption.)
 	 * Record an initial value for the system clock.
 	 */
-	void setup();
+	void setup(boolean reset=false);
 
 	/**
 	 * Check whether the system clock has wrapped, and if so update
@@ -39,5 +39,10 @@ namespace Meters {
 	 * A new item may be taken immediately.
 	 */
 	void add(const byte id[ID12_TAG_LENGTH], byte intervalHours);
+
+	/**
+	 * Remove all saved entries (including unlinking EEPROM entries).
+	 */
+	void clear();
 
 };

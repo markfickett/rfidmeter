@@ -28,6 +28,10 @@ void MomentaryButton::check()
 	wasClosed = isClosed;
 }
 
+boolean MomentaryButton::isPressed() {
+	return wasClosed;
+}
+
 boolean MomentaryButton::wasClicked() {
 	return clicked;
 }

@@ -24,6 +24,8 @@ public:
 
 	void check();
 
-	boolean wasClicked();
+	boolean isPressed(); // Is the button pressed (at last check)?
+
+	boolean wasClicked(); // Was the button pressed and released?
 };
 

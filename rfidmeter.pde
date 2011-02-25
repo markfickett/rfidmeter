@@ -12,7 +12,8 @@
 
 #include "Config.h"
 
-#define PIN_BUTTON		6
+#define PIN_BUTTON_ADD		5
+#define PIN_BUTTON_RESET	6
 
 #define PIN_SPEAKER		8
 #define USE_SPEAKER
@@ -39,7 +40,9 @@
 unsigned int currentTimeMillis;
 byte currentID[ID12_TAG_LENGTH];
 
-MomentaryButton addButton(PIN_BUTTON);
+MomentaryButton resetButton(PIN_BUTTON_RESET);
+
+MomentaryButton addButton(PIN_BUTTON_ADD);
 boolean adding;
 boolean gotAddID;
 #define INTERVAL_COUNT	3
@@ -54,10 +57,6 @@ void setup()
 	pinMode(PIN_STATUS, OUTPUT);
 	digitalWrite(PIN_STATUS, HIGH);
 
-	pinMode(PIN_BUTTON, INPUT);
-
-	digitalWrite(PIN_BUTTON, HIGH);
-
 	pinMode(PIN_SPEAKER, OUTPUT);
 
 	pinMode(PIN_LED_GREEN, OUTPUT);
@@ -67,17 +66,19 @@ void setup()
 	digitalWrite(PIN_SPEAKER, LOW);
 	#endif
 
+	resetButton.setup();
+	resetButton.check();
+
 	ID12::setup();
 	ID12::clear(currentID);
 
-	Meters::setup();
+	Meters::setup(resetButton.isPressed());
 
 	addButton.setup();
 	adding = false;
 	lastAddFeedbackMillis = millis();
 
 	Serial.println("Setup complete.");
-
 	digitalWrite(PIN_STATUS, LOW);
 }
 
@@ -86,6 +87,12 @@ void loop()
 	currentTimeMillis = millis();
 
 	NightLight::updateLight();
+
+	resetButton.check();
+	if (resetButton.wasClicked())
+	{
+		Meters::clear();
+	}
 
 	Meters::checkClock();
 
@@ -113,19 +120,13 @@ void loop()
 	// Something was scanned.
 	if (ID12::hasID())
 	{
-		Serial.println("Reading ID... ");
-		boolean gotID;
-
 		digitalWrite(PIN_STATUS, HIGH);
-		gotID = ID12::getID(currentID);
+		boolean gotID = ID12::getID(currentID);
 		delay(100);
 		digitalWrite(PIN_STATUS, LOW);
 
 		if (gotID)
 		{
-			ID12::print(currentID);
-			Serial.println();
-
 			if (adding)
 			{
 				if (!gotAddID)
@@ -176,7 +177,7 @@ void loop()
 		}
 		else
 		{
-			Serial.println("Error.");
+			Serial.println("Error getting ID.");
 			announceError();
 		}
 	}

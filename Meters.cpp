@@ -32,7 +32,9 @@ namespace Meters {
                 byte intervalHours;
                 unsigned long elapsedMillis;    // rollover when millis() wraps
                 unsigned long lastTakenMillis;  // from millis()
+
 		void *operator new(size_t size) { return malloc(size); }
+		void operator delete(void* ptr) { if (ptr) { free(ptr); } }
 
 		void readFromEEPROM(unsigned int index)
 		{
@@ -70,9 +72,15 @@ namespace Meters {
 	unsigned int getElapsedSeconds(MeteredID *meteredID);
 };
 
-void Meters::setup()
+void Meters::setup(boolean doReset)
 {
-	numMeters = (unsigned int)EEPROM.read(0);
+	if (doReset) {
+		numMeters = 0;
+		EEPROM.write(0, 0);
+	} else {
+		numMeters = (unsigned int)EEPROM.read(0);
+	}
+
 	Serial.print("Reading ");
 	Serial.print(numMeters);
 	Serial.println(" meters from EEPROM.");
@@ -219,5 +227,20 @@ void Meters::add(const byte id[ID12_TAG_LENGTH], byte intervalHours)
 	meters[addIndex]->writeToEEPROM(addIndex, writeID);
 	meters[addIndex]->lastTakenMillis = lastTimeMillis;
 	meters[addIndex]->elapsedMillis = MILLIS_MAX;
+}
+
+void Meters::clear()
+{
+	Serial.println("Clearing saved meters.");
+	if (numMeters <= 0) {
+		return;
+	}
+
+	for(unsigned int i = 0; i < numMeters; i++)
+	{
+		delete meters[i];
+	}
+	numMeters = 0;
+	EEPROM.write(0, numMeters);
 }
 
