@@ -61,7 +61,7 @@ boolean ID12::getID(byte idBuffer[ID12_TAG_LENGTH])
 	#ifdef ID12_DEBUG_PRINT
 	Serial.println("Getting data from RFID.");
 	#else
-	delay(10); // Let the ID-12 finish queueing data?
+	delay(50); // Let the ID-12 finish queueing data?
 	#endif
 	int v, i = -1;
 	byte data, checksum;
