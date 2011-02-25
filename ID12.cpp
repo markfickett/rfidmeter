@@ -6,8 +6,6 @@ NewSoftSerial rfidSerial(PIN_ID12_DATA, PIN_ID12_TX_NC);
 void ID12::setup()
 {
 	pinMode(PIN_ID12_DATA, INPUT);
-	pinMode(PIN_ID12_RESET, OUTPUT);
-	digitalWrite(PIN_ID12_RESET, HIGH);
 
 	#ifdef ID12_DEBUG_PRINT
 	Serial.begin(28800);

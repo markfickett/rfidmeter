@@ -24,7 +24,6 @@
 #include "WProgram.h"
 
 #define PIN_ID12_DATA		5
-#define PIN_ID12_RESET		4
 #define PIN_ID12_TX_NC		12	// unused
 #define ID12_SERIAL_BAUD	9600
 
