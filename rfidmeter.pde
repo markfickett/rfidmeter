@@ -10,6 +10,8 @@
  *
  */
 
+#include "Config.h"
+
 #define PIN_BUTTON		6
 
 #define PIN_SPEAKER		8
@@ -23,22 +25,30 @@
 // Pre-include for ID12, since only the main .pde is pre-processed.
 #include <NewSoftSerial.h>
 
+#include "Meters.h"
+
 // RFID pins #defined in ID12.h
 #include "ID12.h"
 
 // LED and ambient light sensor pins #defined in NightLight.h
 #include "NightLight.h"
 
-typedef struct {
-	byte id[ID12_TAG_LENGTH];
-	unsigned long elapsedMillis;	// rollover when millis() wraps
-	unsigned long lastTakenMillis;	// from millis()
-} MeteredID;
+#include "MomentaryButton.h"
 
 byte currentID[ID12_TAG_LENGTH];
 
+MomentaryButton addButton(PIN_BUTTON);
+boolean adding;
+boolean gotAddID;
+#define INTERVAL_COUNT	3
+unsigned int intervalIndex;
+const byte INTERVALS[] = {24, 12, 4};
+
 void setup()
 {
+	pinMode(PIN_STATUS, OUTPUT);
+	digitalWrite(PIN_STATUS, HIGH);
+
 	pinMode(PIN_BUTTON, INPUT);
 
 	digitalWrite(PIN_BUTTON, HIGH);
@@ -48,115 +58,162 @@ void setup()
 	pinMode(PIN_LED_GREEN, OUTPUT);
 	pinMode(PIN_LED_RED, OUTPUT);
 
-	pinMode(PIN_STATUS, OUTPUT);
-
 	#ifndef USE_SPEAKER
 	digitalWrite(PIN_SPEAKER, LOW);
 	#endif
 
-	// NEXT
-	//read known IDs and their intervals from EEPROM
-	//set all last-taken times to 'unknown'
-
 	ID12::setup();
 	ID12::clear(currentID);
 
-	digitalWrite(PIN_STATUS, HIGH);
-	delay(500);
-	digitalWrite(PIN_STATUS, LOW);
+	Meters::setup();
+
+	addButton.setup();
+	adding = false;
 
 	Serial.begin(28800);
 	Serial.println("Setup complete.");
+
+	digitalWrite(PIN_STATUS, LOW);
 }
 
 void loop()
 {
 	NightLight::updateLight();
 
-	// NEXT
-	//if the system clock has wrapped:
-	//	set all last-taken times appropriately (to neg. or 'long ago')
-	//	millis() -> unsigned long
-	//		overflows after about 50 days
+	Meters::checkClock();
 
-	// NEXT
-	//if the 'new' switch is pressed:
-	//	go into 'waiting for new' mode,
-	//	or finish adding a new item: write the ID and interval to EEPROM
+	addButton.check();
+	if (addButton.wasClicked())
+	{
+		adding = !adding;
+		if (adding)
+		{
+			Serial.println("Adding...");
+			gotAddID = false;
+			intervalIndex = 0;
+		}
+		else if (gotAddID)
+		{
+			Meters::add(currentID, INTERVALS[intervalIndex]);
+			Serial.println("Add complete.");
+		}
+		else
+		{
+			Serial.println("Add cancelled.");
+		}
+	}
 
 	// Something was scanned.
 	if (ID12::hasID())
 	{
-		Serial.println("Retreiving ID...");
-		byte newID[ID12_TAG_LENGTH];
+		Serial.println("Reading ID... ");
 		boolean gotID;
 
-		// status double-blink: reading
 		digitalWrite(PIN_STATUS, HIGH);
-		gotID = ID12::getID(newID);
-		delay(100);
-		digitalWrite(PIN_STATUS, LOW);
-		delay(100);
-		digitalWrite(PIN_STATUS, HIGH);
+		gotID = ID12::getID(currentID);
 		delay(100);
 		digitalWrite(PIN_STATUS, LOW);
 
 		if (gotID)
 		{
-			Serial.print("New: ");
-			ID12::print(newID);
-			// 500ms blink: green for new, red for same
-			int ledPin;
-			if (ID12::equal(newID, currentID))
+			ID12::print(currentID);
+			Serial.println();
+
+			if (adding)
 			{
-				ledPin = PIN_LED_RED;
-				Serial.print(" (same)");
-			} else {
-				ledPin = PIN_LED_GREEN;
-				Serial.print(" (different)");
+				if (!gotAddID)
+				{
+					Serial.println("Ready to add.");
+					gotAddID = true;
+				}
+				else
+				{
+					intervalIndex = (intervalIndex + 1)
+						% INTERVAL_COUNT;
+				}
+				Serial.print("Interval #");
+				Serial.print(intervalIndex);
+				Serial.print(": ");
+				Serial.print((int)INTERVALS[intervalIndex]);
+				#ifdef TEST_WITH_SMALL_VALUES
+				Serial.println("s");
+				#else
+				Serial.println("h");
+				#endif
 			}
-			Serial.println();
-
-			digitalWrite(ledPin, HIGH);
-			delay(500);
-			digitalWrite(ledPin, LOW);
-
-			Serial.print("\tOld:\t");
-			ID12::print(currentID);
-			ID12::copy(currentID, newID);
-			Serial.print("\n\tSaved:\t");
-			ID12::print(currentID);
-			Serial.println();
+			else
+			{
+				boolean allowed;
+				boolean found = Meters::checkAndUpdate(
+					currentID,
+					&allowed);
+				if (found)
+				{
+					if (allowed)
+					{
+						announceYes();
+					}
+					else
+					{
+						announceNo();
+					}
+				}
+				else
+				{
+					Serial.print("No record of ");
+					ID12::print(currentID);
+					Serial.println();
+					announceError();
+				}
+			}
 		}
 		else
 		{
 			Serial.println("Error.");
-			// 2s blink red: fail
-			digitalWrite(PIN_LED_RED, HIGH);
-			delay(2000);
-			digitalWrite(PIN_LED_RED, LOW);
+			announceError();
 		}
-
-		/* NEXT
-		if 'waiting for new':
-			- record new, set to once daily (every 24h)
-			- set to twice daily (every 12h)
-			- set to every 4h
-		otherwise:
-			look up last-taken time
-				- no entry: refuse
-				- taken too recently: red LED, 'no' noise
-				- ok: green LED, 'yes' noise, record time
-			#ifdef USE_SPEAKER
-			tone(PIN_SPEAKER, 440);
-			noTone(PIN_SPEAKER);
-			#endif
-
-			digitalWrite(PIN_LED_GREEN, HIGH);
-			digitalWrite(PIN_LED_GREEN, LOW);
-			digitalWrite(PIN_LED_RED, HIGH);
-			digitalWrite(PIN_LED_RED, LOW);
-		*/
 	}
+}
+
+
+void beepOrWait(int frequency, int duration)
+{
+	#ifdef USE_SPEAKER
+	tone(PIN_SPEAKER, frequency);
+	#endif
+	delay(duration);
+	#ifdef USE_SPEAKER
+	noTone(PIN_SPEAKER);
+	#endif
+}
+
+void announceYes()
+{
+	// C, F, A: 261, 349, 440
+	digitalWrite(PIN_LED_GREEN, HIGH);
+	beepOrWait(261, 100);
+	beepOrWait(349, 100);
+	beepOrWait(440, 100);
+	digitalWrite(PIN_LED_GREEN, LOW);
+}
+
+void announceNo()
+{
+	// D, C#, D, C#: 293, 277
+	digitalWrite(PIN_LED_RED, HIGH);
+	beepOrWait(293, 100);
+	beepOrWait(277, 100);
+	beepOrWait(293, 100);
+	beepOrWait(277, 100);
+	digitalWrite(PIN_LED_RED, LOW);
+}
+
+void announceError()
+{
+	digitalWrite(PIN_LED_RED, HIGH);
+	beepOrWait(277, 500);
+	delay(100);
+	beepOrWait(277, 500);
+	digitalWrite(PIN_LED_RED, LOW);
 }
 
