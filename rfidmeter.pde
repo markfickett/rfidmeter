@@ -8,9 +8,27 @@
  * reported as 'safe to take' (green LED) or 'already taken' (red LED). (An item
  * reported as 'safe to take' is then assumed to be immediately taken.)
  *
+ * To add a new ID (pill bottle), or to set a new interval, press the 'Add'
+ * button (red and green blink), then scan the item; repeat scanning to cycle
+ * the interval (green blinks: once for daily, twice for twice daily, thrice
+ * for every 4h). Press 'Add' again to finish (or cancel).
+ *
+ * Press 'Reset' to clear saved IDs (which are persistent over power cycling,
+ * saved to EEPROM); or hold 'Reset' when turning on power to avoid reading
+ * saved entries (for example, the first time, when EEPROM has garbage data).
  */
 
+// Pre-includes for ID12 and Meters, since only the main .pde is pre-processed.
+#include <NewSoftSerial.h>
+#include <EEPROM.h>
+
 #include "Config.h"
+#include "MomentaryButton.h"
+
+// some pin #s defined in their respective headers
+#include "Meters.h"
+#include "ID12.h"
+#include "NightLight.h"
 
 #define PIN_BUTTON_ADD		5
 #define PIN_BUTTON_RESET	6
@@ -22,20 +40,6 @@
 #define PIN_LED_RED		11
 
 #define PIN_STATUS		13
-
-// Pre-includes for ID12 and Meters, since only the main .pde is pre-processed.
-#include <NewSoftSerial.h>
-#include <EEPROM.h>
-
-#include "Meters.h"
-
-// RFID pins #defined in ID12.h
-#include "ID12.h"
-
-// LED and ambient light sensor pins #defined in NightLight.h
-#include "NightLight.h"
-
-#include "MomentaryButton.h"
 
 unsigned int currentTimeMillis;
 byte currentID[ID12_TAG_LENGTH];
@@ -52,31 +56,29 @@ unsigned int lastAddFeedbackMillis;
 
 void setup()
 {
-	Serial.begin(28800);
-
 	pinMode(PIN_STATUS, OUTPUT);
 	digitalWrite(PIN_STATUS, HIGH);
+	Serial.begin(28800);
 
 	pinMode(PIN_SPEAKER, OUTPUT);
-
-	pinMode(PIN_LED_GREEN, OUTPUT);
-	pinMode(PIN_LED_RED, OUTPUT);
-
 	#ifndef USE_SPEAKER
 	digitalWrite(PIN_SPEAKER, LOW);
 	#endif
 
+	pinMode(PIN_LED_GREEN, OUTPUT);
+	pinMode(PIN_LED_RED, OUTPUT);
+
 	resetButton.setup();
 	resetButton.check();
+
+	addButton.setup();
+	adding = false;
+	lastAddFeedbackMillis = millis();
 
 	ID12::setup();
 	ID12::clear(currentID);
 
 	Meters::setup(resetButton.isPressed());
-
-	addButton.setup();
-	adding = false;
-	lastAddFeedbackMillis = millis();
 
 	Serial.println("Setup complete.");
 	digitalWrite(PIN_STATUS, LOW);
@@ -86,59 +88,47 @@ void loop()
 {
 	currentTimeMillis = millis();
 
+	addButton.check();
+	resetButton.check();
+
 	NightLight::updateLight();
 
-	resetButton.check();
-	if (resetButton.wasClicked())
-	{
+	if (resetButton.wasClicked()) {
 		Meters::clear();
 	}
 
 	Meters::checkClock();
 
-	addButton.check();
-	if (addButton.wasClicked())
-	{
+	if (addButton.wasClicked()) {
 		adding = !adding;
-		if (adding)
-		{
+		if (adding) {
 			Serial.println("Adding...");
 			gotAddID = false;
 			intervalIndex = 0;
-		}
-		else if (gotAddID)
-		{
+		} else if (gotAddID) {
 			Meters::add(currentID, INTERVALS[intervalIndex]);
 			Serial.println("Add complete.");
-		}
-		else
-		{
+		} else {
 			Serial.println("Add cancelled.");
 		}
 	}
 
 	// Something was scanned.
-	if (ID12::hasID())
-	{
+	if (ID12::hasID()) {
 		digitalWrite(PIN_STATUS, HIGH);
 		boolean gotID = ID12::getID(currentID);
-		delay(100);
 		digitalWrite(PIN_STATUS, LOW);
 
-		if (gotID)
-		{
-			if (adding)
-			{
-				if (!gotAddID)
-				{
+		if (gotID) {
+			if (adding) {
+				if (!gotAddID) {
 					Serial.println("Ready to add.");
 					gotAddID = true;
-				}
-				else
-				{
+				} else {
 					intervalIndex = (intervalIndex + 1)
 						% INTERVAL_COUNT;
 				}
+
 				Serial.print("Interval #");
 				Serial.print(intervalIndex);
 				Serial.print(": ");
@@ -148,46 +138,35 @@ void loop()
 				#else
 				Serial.println("h");
 				#endif
-			}
-			else
-			{
+			} else {
 				boolean allowed;
 				boolean found = Meters::checkAndUpdate(
 					currentID,
 					&allowed);
-				if (found)
-				{
-					if (allowed)
-					{
+
+				if (found) {
+					if (allowed) {
 						announceYes();
-					}
-					else
-					{
+					} else {
 						announceNo();
 					}
-				}
-				else
-				{
+				} else {
 					Serial.print("No record of ");
 					ID12::print(currentID);
 					Serial.println();
 					announceError();
 				}
 			}
-		}
-		else
-		{
+		} else {
 			Serial.println("Error getting ID.");
 			announceError();
 		}
 	}
 
 	// Blink for feedback during adding.
-	if (adding && (currentTimeMillis - lastAddFeedbackMillis) > 1000)
-	{
+	if (adding && (currentTimeMillis - lastAddFeedbackMillis) > 1000) {
 		lastAddFeedbackMillis = currentTimeMillis;
-		if (gotAddID)
-		{
+		if (gotAddID) {
 			for(int i = 0; i <= intervalIndex; i++)
 			{
 				digitalWrite(PIN_LED_GREEN, HIGH);
@@ -195,15 +174,10 @@ void loop()
 				digitalWrite(PIN_LED_GREEN, LOW);
 				delay(100);
 			}
-		}
-		else
-		{
-			digitalWrite(PIN_LED_GREEN, HIGH);
-			delay(100);
-			digitalWrite(PIN_LED_GREEN, LOW);
-			delay(100);
-			digitalWrite(PIN_LED_RED, HIGH);
-			delay(100);
+		} else {
+			digitalWrite(PIN_LED_GREEN, HIGH);	delay(100);
+			digitalWrite(PIN_LED_GREEN, LOW);	delay(100);
+			digitalWrite(PIN_LED_RED, HIGH);	delay(100);
 			digitalWrite(PIN_LED_RED, LOW);
 		}
 	}
