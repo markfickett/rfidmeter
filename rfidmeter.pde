@@ -35,6 +35,7 @@
 
 #include "MomentaryButton.h"
 
+unsigned int currentTimeMillis;
 byte currentID[ID12_TAG_LENGTH];
 
 MomentaryButton addButton(PIN_BUTTON);
@@ -43,6 +44,7 @@ boolean gotAddID;
 #define INTERVAL_COUNT	3
 unsigned int intervalIndex;
 const byte INTERVALS[] = {24, 12, 4};
+unsigned int lastAddFeedbackMillis;
 
 void setup()
 {
@@ -69,6 +71,7 @@ void setup()
 
 	addButton.setup();
 	adding = false;
+	lastAddFeedbackMillis = millis();
 
 	Serial.begin(28800);
 	Serial.println("Setup complete.");
@@ -78,6 +81,8 @@ void setup()
 
 void loop()
 {
+	currentTimeMillis = millis();
+
 	NightLight::updateLight();
 
 	Meters::checkClock();
@@ -175,8 +180,9 @@ void loop()
 	}
 
 	// Blink for feedback during adding.
-	if (adding)
+	if (adding && (currentTimeMillis - lastAddFeedbackMillis) > 1000)
 	{
+		lastAddFeedbackMillis = currentTimeMillis;
 		if (gotAddID)
 		{
 			for(int i = 0; i <= intervalIndex; i++)
@@ -197,7 +203,6 @@ void loop()
 			delay(100);
 			digitalWrite(PIN_LED_RED, LOW);
 		}
-		delay(1000);
 	}
 }
 
