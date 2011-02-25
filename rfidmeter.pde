@@ -15,7 +15,7 @@
 #define PIN_BUTTON		6
 
 #define PIN_SPEAKER		8
-//#define USE_SPEAKER
+#define USE_SPEAKER
 
 #define PIN_LED_GREEN		10
 #define PIN_LED_RED		11
@@ -172,6 +172,32 @@ void loop()
 			Serial.println("Error.");
 			announceError();
 		}
+	}
+
+	// Blink for feedback during adding.
+	if (adding)
+	{
+		if (gotAddID)
+		{
+			for(int i = 0; i <= intervalIndex; i++)
+			{
+				digitalWrite(PIN_LED_GREEN, HIGH);
+				delay(100);
+				digitalWrite(PIN_LED_GREEN, LOW);
+				delay(100);
+			}
+		}
+		else
+		{
+			digitalWrite(PIN_LED_GREEN, HIGH);
+			delay(100);
+			digitalWrite(PIN_LED_GREEN, LOW);
+			delay(100);
+			digitalWrite(PIN_LED_RED, HIGH);
+			delay(100);
+			digitalWrite(PIN_LED_RED, LOW);
+		}
+		delay(1000);
 	}
 }
 
