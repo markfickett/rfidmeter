@@ -22,8 +22,9 @@
 
 #define PIN_STATUS		13
 
-// Pre-include for ID12, since only the main .pde is pre-processed.
+// Pre-includes for ID12 and Meters, since only the main .pde is pre-processed.
 #include <NewSoftSerial.h>
+#include <EEPROM.h>
 
 #include "Meters.h"
 
@@ -48,6 +49,8 @@ unsigned int lastAddFeedbackMillis;
 
 void setup()
 {
+	Serial.begin(28800);
+
 	pinMode(PIN_STATUS, OUTPUT);
 	digitalWrite(PIN_STATUS, HIGH);
 
@@ -73,7 +76,6 @@ void setup()
 	adding = false;
 	lastAddFeedbackMillis = millis();
 
-	Serial.begin(28800);
 	Serial.println("Setup complete.");
 
 	digitalWrite(PIN_STATUS, LOW);

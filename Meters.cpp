@@ -3,6 +3,11 @@
 
 #include "WProgram.h"
 
+#include <EEPROM.h>
+
+// 4294967295
+const unsigned long MILLIS_MAX = ~0;
+
 namespace Meters {
 	/**
 	 * Storage in EEPROM is:
@@ -11,14 +16,15 @@ namespace Meters {
 	 *	ID12_TAG_LENGTH bytes	ID
 	 *	1 byte			consumption interval minimum (hours)
 	 */
+	const int METEREDID_BYTES = (1 + ID12_TAG_LENGTH);
         const int NUM_METERS_MAX
 		#ifdef TEST_WITH_SMALL_VALUES
 		= 3;
 		#else
-		= (512 - 1) / (1 + ID12_TAG_LENGTH);
+		= (512 - 1) / METEREDID_BYTES;
 		#endif
 	unsigned int numMeters;
-	unsigned int lastTimeMillis;
+	unsigned long lastTimeMillis;
 
 	class MeteredID {
 		public:
@@ -27,6 +33,33 @@ namespace Meters {
                 unsigned long elapsedMillis;    // rollover when millis() wraps
                 unsigned long lastTakenMillis;  // from millis()
 		void *operator new(size_t size) { return malloc(size); }
+
+		void readFromEEPROM(unsigned int index)
+		{
+			unsigned int baseAddress = 1 + index*METEREDID_BYTES;
+			for(unsigned int i = 0; i < ID12_TAG_LENGTH; i++)
+			{
+				id[i] = EEPROM.read(baseAddress + i);
+			}
+			intervalHours = EEPROM.read(baseAddress
+				+ ID12_TAG_LENGTH);
+                	elapsedMillis = MILLIS_MAX;
+                	lastTakenMillis = 0;
+		}
+
+		void writeToEEPROM(unsigned int index, boolean writeID)
+		{
+			unsigned int baseAddress = 1 + index*METEREDID_BYTES;
+			if (writeID)
+			{
+				for(unsigned int i=0; i < ID12_TAG_LENGTH; i++)
+				{
+					EEPROM.write(baseAddress + i, id[i]);
+				}
+			}
+			EEPROM.write(baseAddress + ID12_TAG_LENGTH,
+				intervalHours);
+		}
         };
 
 	MeteredID *meters[NUM_METERS_MAX] = {NULL};
@@ -39,15 +72,26 @@ namespace Meters {
 
 void Meters::setup()
 {
-	numMeters = 0;
-	// NEXT read from EEPROM,
-	//	setting last-consumed to unknown
+	numMeters = (unsigned int)EEPROM.read(0);
+	Serial.print("Reading ");
+	Serial.print(numMeters);
+	Serial.println(" meters from EEPROM.");
+	for(unsigned int i = 0; i < numMeters; i++)
+	{
+		meters[i] = new MeteredID();
+		meters[i]->readFromEEPROM(i);
+		Serial.print("\t");
+		ID12::print(meters[i]->id);
+		Serial.print(": interval ");
+		Serial.print((int)meters[i]->intervalHours);
+		#ifdef TEST_WITH_SMALL_VALUES
+		Serial.println("s");
+		#else
+		Serial.println("h");
+		#endif
+	}
 	lastTimeMillis = millis();
-	MeteredID a;
 }
-
-// TODO is there a numeric_limits in AVR?
-#define MILLIS_MAX	4294967295
 
 void Meters::checkClock()
 {
@@ -134,11 +178,13 @@ void Meters::add(const byte id[ID12_TAG_LENGTH], byte intervalHours)
 	ID12::print(id);
 	Serial.print(": ");
 	int addIndex = getMeterIndex(id);
+	boolean writeID = false;
 	if (addIndex == -1)
 	{
 		if (numMeters < NUM_METERS_MAX)
 		{
 			addIndex = numMeters++;
+			EEPROM.write(0, (byte)numMeters);
 			meters[addIndex] = new MeteredID();
 			Serial.println("New entry.");
 		}
@@ -162,7 +208,7 @@ void Meters::add(const byte id[ID12_TAG_LENGTH], byte intervalHours)
 			Serial.println(" ago.");
 		}
 		ID12::copy(meters[addIndex]->id, id);
-		// NEXT write ID to EEPROM
+		writeID = true;
 	}
 	else
 	{
@@ -170,7 +216,7 @@ void Meters::add(const byte id[ID12_TAG_LENGTH], byte intervalHours)
 	}
 
 	meters[addIndex]->intervalHours = intervalHours;
-	// NEXT write interval to EEPROM
+	meters[addIndex]->writeToEEPROM(addIndex, writeID);
 	meters[addIndex]->lastTakenMillis = lastTimeMillis;
 	meters[addIndex]->elapsedMillis = MILLIS_MAX;
 }
