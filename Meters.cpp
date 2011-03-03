@@ -45,7 +45,7 @@ namespace Meters {
 			}
 			intervalHours = EEPROM.read(baseAddress
 				+ ID12_TAG_LENGTH);
-                	elapsedMillis = MILLIS_MAX;
+                	elapsedMillis = 0;
                 	lastTakenMillis = 0;
 		}
 
@@ -69,7 +69,7 @@ namespace Meters {
 	/** @return the index of the meter for the given ID, or -1. */
 	int getMeterIndex(const byte id[ID12_TAG_LENGTH]);
 	/** @return the number of seconds since last taken */
-	unsigned int getElapsedSeconds(MeteredID *meteredID);
+	unsigned long getElapsedSeconds(MeteredID *meteredID);
 };
 
 void Meters::setup(boolean doReset)
@@ -104,9 +104,10 @@ void Meters::setup(boolean doReset)
 void Meters::checkClock()
 {
 	// wraps about every 50 days
-	unsigned int newTimeMillis = millis();
+	unsigned long newTimeMillis = millis();
 	if (newTimeMillis < Meters::lastTimeMillis)
 	{
+		Serial.println("Clock wrapped.");
 		for(int i = 0; i < numMeters; ++i)
 		{
 			unsigned int newElapsed = meters[i]->elapsedMillis
@@ -129,8 +130,20 @@ int Meters::getMeterIndex(const byte id[ID12_TAG_LENGTH])
 	return -1;
 }
 
-unsigned int Meters::getElapsedSeconds(MeteredID *meteredID)
+unsigned long Meters::getElapsedSeconds(MeteredID *meteredID)
 {
+	Serial.print("Elapsed for ");
+	ID12::print(meteredID->id);
+	Serial.println(":");
+	unsigned long newElapsedMillis =
+		lastTimeMillis - meteredID->lastTakenMillis;
+	Serial.print("\tnewElapsed:\t");
+	Serial.print(newElapsedMillis);
+	Serial.println("ms");
+	Serial.print("\told elapsed:\t");
+	Serial.print(meteredID->elapsedMillis);
+	Serial.println("ms");
+	
 	return (lastTimeMillis - meteredID->lastTakenMillis)
 		/1000
 	+ meteredID->elapsedMillis/1000;
@@ -149,8 +162,8 @@ boolean Meters::checkAndUpdate(const byte id[ID12_TAG_LENGTH],
 		return false;
 	}
 
-	unsigned int elapsedSecs = getElapsedSeconds(meters[i]);
-	unsigned int intervalSecs =
+	unsigned long elapsedSecs = getElapsedSeconds(meters[i]);
+	unsigned long intervalSecs =
 		#ifndef TEST_WITH_SMALL_VALUES
 		60*60*
 		#endif
@@ -198,7 +211,7 @@ void Meters::add(const byte id[ID12_TAG_LENGTH], byte intervalHours)
 		}
 		else
 		{
-			unsigned int maxElapsedSecs = 0, elapsedSecs;
+			unsigned long maxElapsedSecs = 0, elapsedSecs;
 			for(int i = 0; i < numMeters; ++i)
 			{
 				elapsedSecs =
