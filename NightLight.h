@@ -7,7 +7,8 @@
 
 #define PIN_SENSOR_PHOTO	A0
 #define PIN_LED_LIGHT		9	// with PWM
-#define PHOTO_SENSOR_THRESHOLD	900
+#define PHOTO_SENSOR_TURN_ON	900
+#define PHOTO_SENSOR_STAY_ON	800
 // Sensor values:
 //	direct sunlight		12
 //	bright room, sunny day	156-123

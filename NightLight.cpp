@@ -22,12 +22,15 @@ void NightLight::setup()
 void NightLight::updateLight()
 {
 	int v = analogRead(PIN_SENSOR_PHOTO);
+	boolean shouldBeOnNow = isOn ?
+		v >= PHOTO_SENSOR_STAY_ON :
+		v >= PHOTO_SENSOR_TURN_ON;
 
 	unsigned long currentMillis = millis();
 	unsigned long elapsedMillis = currentMillis - lastChangeMillis;
 
-	if(v >= PHOTO_SENSOR_THRESHOLD != shouldBeOn) {
-		shouldBeOn = !shouldBeOn;
+	if(shouldBeOnNow != shouldBeOn) {
+		shouldBeOn = shouldBeOnNow;
 		lastChangeMillis = currentMillis;
 	} else if (isOn != shouldBeOn && elapsedMillis >= SWITCH_DELAY) {
 		isOn = shouldBeOn;
