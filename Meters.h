@@ -4,6 +4,12 @@
 
 #define EEPROM_SIZE	512
 
+// Allow taking something at TOLERANCE of its required interval,
+// to avoid interval creep. (For example, something taken every 24 hours might
+// end up being taken at 8:00, but then the next day have to wait until 8:02,
+// and so on.)
+#define TOLERANCE	0.9
+
 /**
  * Provide data structures for metering RFIDs,
  * and functions for saving to and reading from EEPROM.

@@ -168,10 +168,15 @@ boolean Meters::checkAndUpdate(const byte id[ID12_TAG_LENGTH],
 		60*60*
 		#endif
 		(unsigned long)meters[i]->intervalHours;
+	intervalSecs = (unsigned long)(TOLERANCE*(float)intervalSecs);
 
 	Serial.print("Elapsed: ");
 	Serial.print(elapsedSecs);
-	Serial.print("s >=? Interval: ");
+	Serial.print("s >=? Interval: (");
+	Serial.print(TOLERANCE);
+	Serial.print("*");
+	Serial.print(meters[i]->intervalHours);
+	Serial.print("h) ");
 	Serial.print(intervalSecs);
 	Serial.print("s -> ");
 
